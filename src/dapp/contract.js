@@ -106,7 +106,7 @@ export default class Contract {
     console.log("Getting credits  for passenger " + self.passengers[0]);
 
     self.flightSuretyApp.methods
-      .getCredits(self.passengers[0])
-      .call({ from: self.owner }, callback);
+      .getCredits()
+      .call({ from: self.passengers[0] }, callback);
   }
 }

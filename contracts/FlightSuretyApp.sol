@@ -124,15 +124,13 @@ contract FlightSuretyApp {
      */
     function getCredits
                             ( 
-                                address customer  
                             )
                             public
                             view
-                            requireContractOwner
                             returns(uint256)
 
     {
-        return flightSuretyData.getCredits(customer);
+        return flightSuretyData.getCredits(msg.sender);
     }
 
 

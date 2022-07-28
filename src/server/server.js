@@ -76,7 +76,7 @@ flightSuretyApp.events.OracleRequest(
     .send({ from: accounts[0] });
   let fee = await flightSuretyApp.methods.REGISTRATION_FEE().call();
   try {
-    accounts.forEach((account) => {
+    accounts.forEach(async (account) => {
       await flightSuretyApp.methods.registerOracle().send({
         from: account,
         value: fee,

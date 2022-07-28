@@ -316,7 +316,6 @@ contract FlightSuretyData {
                             public
                             view
                             requireIsOperational
-                            requireAuthorizedCaller
                             returns(uint256)
     {
         return customerCredits[customer];
