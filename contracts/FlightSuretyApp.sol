@@ -26,13 +26,8 @@ contract FlightSuretyApp {
 
     address private contractOwner;          // Account used to deploy contract
 
-    struct Flight {
-        bool isRegistered;
-        uint8 statusCode;
-        uint256 updatedTimestamp;        
-        address airline;
-    }
-    mapping(bytes32 => Flight) private flights;
+    uint8 private constant INSURANCE_PRICE_IN_ETHER = 1;
+    FlightSuretyData private flightSuretyData;
 
  
     /********************************************************************************************/
@@ -50,7 +45,7 @@ contract FlightSuretyApp {
     modifier requireIsOperational() 
     {
          // Modify to call data contract's status
-        require(true, "Contract is currently not operational");  
+        require(flightSuretyData.isOperational(), "Contract is currently not operational");  
         _;  // All modifiers require an "_" which indicates where the function body will be added
     }
 
@@ -73,10 +68,12 @@ contract FlightSuretyApp {
     */
     constructor
                                 (
+                                    address dataContract
                                 ) 
                                 public 
     {
         contractOwner = msg.sender;
+        flightSuretyData = FlightSuretyData(dataContract);
     }
 
     /********************************************************************************************/
@@ -85,10 +82,10 @@ contract FlightSuretyApp {
 
     function isOperational() 
                             public 
-                            pure 
+                            view
                             returns(bool) 
     {
-        return true;  // Modify to call data contract's status
+        return flightSuretyData.isOperational();  // Modify to call data contract's status
     }
 
     /********************************************************************************************/
@@ -101,13 +98,41 @@ contract FlightSuretyApp {
     *
     */   
     function registerAirline
-                            (   
+                            (
+                                address newAirLine  
                             )
                             external
-                            pure
                             returns(bool success, uint256 votes)
     {
-        return (success, 0);
+        return flightSuretyData.registerAirline(newAirLine);
+    }
+
+    /**
+        Let airlines put their share of fund
+    */
+    function fund
+                            (   
+                            )
+                            public
+                            payable
+    {
+        flightSuretyData.fund(msg.sender, msg.value);
+    }
+
+    /**
+        Fetch credits of the given customer
+     */
+    function getCredits
+                            ( 
+                                address customer  
+                            )
+                            public
+                            view
+                            requireContractOwner
+                            returns(uint256)
+
+    {
+        return flightSuretyData.getCredits(customer);
     }
 
 
@@ -117,11 +142,14 @@ contract FlightSuretyApp {
     */  
     function registerFlight
                                 (
+                                    bytes32 flightName,
+                                    bool isRegistered,
+                                    uint8 statusCode,
+                                    uint256 updatedTimestamp       
                                 )
                                 external
-                                pure
     {
-
+        return flightSuretyData.registerFlight(flightName, isRegistered, statusCode, updatedTimestamp);
     }
     
    /**
@@ -136,8 +164,10 @@ contract FlightSuretyApp {
                                     uint8 statusCode
                                 )
                                 internal
-                                pure
     {
+        if(statusCode == STATUS_CODE_LATE_AIRLINE) {//Refund
+            flightSuretyData.refundToCustomers(flight);//Assumption: flight codes are unique
+        }
     }
 
 
@@ -162,6 +192,32 @@ contract FlightSuretyApp {
         emit OracleRequest(index, airline, flight, timestamp);
     } 
 
+   /**
+    * @dev Buy an insurance for a flight
+    * Ability to purchase flight insurance for 1 ether
+    */   
+    function buy
+                            (  
+                                string flight                      
+                            )
+                            external
+                            payable
+                            requireIsOperational
+    {
+        require(msg.value == (1 ether), "Please send exactly one ether");
+        flightSuretyData.buy(flight, msg.sender);
+    }
+
+    //Let customer withdraw
+    function withdraw
+                            (
+                                
+                            )
+                            payable
+                            external
+    {
+        flightSuretyData.withdraw(msg.sender);
+    }
 
 // region ORACLE MANAGEMENT
 
@@ -265,6 +321,7 @@ contract FlightSuretyApp {
         // Information isn't considered verified until at least MIN_RESPONSES
         // oracles respond with the *** same *** information
         emit OracleReport(airline, flight, timestamp, statusCode);
+
         if (oracleResponses[key].responses[statusCode].length >= MIN_RESPONSES) {
 
             emit FlightStatusInfo(airline, flight, timestamp, statusCode);
@@ -335,3 +392,14 @@ contract FlightSuretyApp {
 // endregion
 
 }   
+
+contract FlightSuretyData {
+    function isOperational() public view returns(bool);
+    function registerAirline(address newAirline) external returns(bool success, uint256 votes);
+    function registerFlight(bytes32 flightKey, bool isRegistered, uint8 statusCode, uint256 updatedTimestamp) external;
+    function refundToCustomers(string  flight) external; 
+    function fund(address airline, uint256 amount) public payable;
+    function buy(string flight, address customer) external;
+    function withdraw(address customer) external payable;
+    function getCredits(address customer) public view returns(uint256);    
+}

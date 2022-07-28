@@ -1,33 +1,87 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
     <title>FlightSurety</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.1/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  </head>
 
-<body>
-
+  <body>
     <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
-        <a class="navbar-brand" href="#">FlightSurety</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault" aria-controls="navbarsExampleDefault"
-            aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+      <a class="navbar-brand" href="#">FlightSurety</a>
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-toggle="collapse"
+        data-target="#navbarsExampleDefault"
+        aria-controls="navbarsExampleDefault"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
     </nav>
-
     <main class="container">
+      <div id="display-wrapper" class="top-20"></div>
+      <div class="row top-20">
+        <btn class="btn btn-primary" id="display-funds"
+          >Display funds available with contract</btn
+        >
+        <label class="form left-20" id="contract-funds">0 ether</label><br />
+      </div>
+      <div class="row top-20">
+        <btn class="btn btn-primary" id="submit-funds">Fund this contract</btn>
+        <label class="form left-20"
+          >Contract owner who is first registsred airline will put 10
+          ethers</label
+        ><br />
+      </div>
 
-        <div id="display-wrapper" class="top-20">
-        </div>
-        <div class="row top-20">
-            <label class="form">Flight</label> <input type="text" id="flight-number"> <btn class="btn btn-primary" id="submit-oracle">Submit to Oracles</btn>
-        </div>
+      <div class="row top-50">
+        <label>Buy Flight Insurance (price is 1 Ether)</label><br />
+      </div>
+      <div class="row">
+        <select name="flights" id="flights" class="form">
+          <option value="ANA-1">ANA-1</option>
+          <option value="ANA-2" selected="selected">ANA-2</option>
+          <option value="ANA-3">ANA-3</option>
+          <option value="ANA-4">ANA-4</option>
+        </select>
+        <btn class="btn btn-primary left-20" id="buy">Buy</btn>
+      </div>
+
+      <div class="row top-50"><label>Fetch Flight Status</label><br /></div>
+      <div class="row">
+        <select name="flights-check" id="flights-check">
+          <option value="ANA-1">ANA-1</option>
+          <option value="ANA-2" selected="selected">ANA-2</option>
+          <option value="ANA-3">ANA-3</option>
+          <option value="ANA-4">ANA-4</option>
+        </select>
+        <btn class="btn btn-primary left-20" id="submit-oracle"
+          >Submit to Oracles</btn
+        >
+      </div>
+
+      <div class="row top-50">
+        <btn class="btn btn-primary" id="get-balance">Display my balance</btn>
+        <label class="form left-20" id="my-balance">0 ether</label><br />
+      </div>
+      <div class="row top-20">
+        <btn class="btn btn-primary" id="get-credit">Display my credit</btn>
+        <label class="form left-20" id="my-credit">0 ether</label><br />
+      </div>
+      <div class="row top-20">
+        <btn class="btn btn-primary" id="withdraw">Withdraw my credits</btn>
+      </div>
     </main>
-
-</body>
-
+  </body>
 </html>

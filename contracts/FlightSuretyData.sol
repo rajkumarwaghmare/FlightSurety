@@ -5,12 +5,31 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 contract FlightSuretyData {
     using SafeMath for uint256;
 
+    uint8 private constant MAX_INITIAL_REGISTRABLE_AIRLINES = 4;
+    uint256 private constant MIN_FUNDING = 1e19;//10 ethers
+    uint256 private constant INSURANCE_REFUND_IN_ETHER = 1.5 * 1e18;//1.5 ethers in wei
+
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
+
+    struct Flight {
+        bool isRegistered;
+        uint8 statusCode;
+        uint256 updatedTimestamp;        
+        address airline;
+    }
+    mapping(bytes32 => Flight) private flights;
+    mapping(address => bool) private airlines; //Register AirLine with initial funding status as false
+    uint256 private registeredAirlinesCount = 0;//as we cant get length/size of mapping
+    mapping(address => bool) private authorizedCallers;// Who can call this contract
+    mapping(address => uint8) private airlineRegistrationVotes;
+    mapping(address => uint256) private airlineFunding;
+    mapping(string => address[]) private insuranceCustomers;//Map flight to array of customers who bought insurance for this flight
+    mapping(address => uint256) private customerCredits;//customer address to credits
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -27,6 +46,13 @@ contract FlightSuretyData {
                                 public 
     {
         contractOwner = msg.sender;
+        authorizedCallers[msg.sender] = true;//So that FlightSuretyApp can call methods of this contract
+        /**
+            TODO check how we can pass first airline address to this contract while creating an object in FlightSuretyApp
+         */
+        airlines[msg.sender] = true;//Register first airline. 
+        registeredAirlinesCount++;
+        airlineFunding[msg.sender] = MIN_FUNDING;
     }
 
     /********************************************************************************************/
@@ -54,6 +80,38 @@ contract FlightSuretyData {
     {
         require(msg.sender == contractOwner, "Caller is not contract owner");
         _;
+    }
+
+    modifier requireAuthorizedCaller()
+    {
+        require(authorizedCallers[msg.sender], "Caller is not authorized");
+        _;
+    }
+
+    /**
+        Add to the list of authorized callers who can call this contract.
+        ONLY contract owner can make this call.
+     */
+    function authorizeCaller
+                            (
+                                address caller
+                            )
+                            external
+                            requireIsOperational
+    {
+        authorizedCallers[caller] = true;
+    }
+
+    //Revert the permissions
+    function deAuthorizeCaller
+                            (
+                                address caller
+                            )
+                            external
+                            requireIsOperational
+                            requireContractOwner 
+    {
+        authorizedCallers[caller] = false;
     }
 
     /********************************************************************************************/
@@ -99,25 +157,97 @@ contract FlightSuretyData {
     *
     */   
     function registerAirline
-                            (   
+                            (
+                                address newAirline   
                             )
                             external
-                            pure
+                            requireIsOperational
+                            requireAirLineRegistrable
+                            returns(bool success, uint256 votes)
     {
+        require(!airlines[newAirline], "This AirLine is already registered!");
+        airlineRegistrationVotes[newAirline] += 1;
+        //Registration of fifth and subsequent airlines requires multi-party consensus of 50% of registered airlines
+        if(registeredAirlinesCount < MAX_INITIAL_REGISTRABLE_AIRLINES 
+            || airlineRegistrationVotes[newAirline] >= registeredAirlinesCount/2) {
+            airlines[newAirline] = true;
+            registeredAirlinesCount++;
+            return (true, airlineRegistrationVotes[newAirline]);
+        } else {
+           return (false, airlineRegistrationVotes[newAirline]);
+        }
     }
 
+    /**
+        Get the count of registered airlines so far.
+        Can only be called from FlightSuretyApp
+     */
+    function registeredAirLinesCount()
+                                    view
+                                    external
+                                    requireIsOperational
+                                    requireAuthorizedCaller
+                                    returns(uint256)
+    {
+        return registeredAirlinesCount;
+    }
+
+    //Check if this AirLine is registered.
+    function isRegisteredAirLine
+                                (
+                                    address airlineAddress
+                                )
+                                view
+                                public
+                                requireIsOperational
+                                requireAuthorizedCaller
+                                returns(bool)
+    {
+        return airlines[airlineAddress];
+    }
+
+    modifier requireAirLineRegistrable()
+    {
+        //check fund of calling airline
+        bool canBeRegistered = airlineFunding[msg.sender] == MIN_FUNDING;
+        require(airlineFunding[msg.sender] != 0, "This AirLine Can not be registered");
+        _;
+    }
+
+   /**
+    * @dev Register a future flight for insuring.
+    *
+    */  
+    function registerFlight
+                                (
+                                    bytes32 flightKey,
+                                    bool isRegistered,
+                                    uint8 statusCode,
+                                    uint256 updatedTimestamp       
+                                )
+                                external
+                                requireIsOperational
+                                requireAuthorizedCaller
+    {
+        require(isRegisteredAirLine(msg.sender), "This AirLine is not registsred!");
+        require(flights[flightKey].isRegistered, "This Flight is already registered!");
+
+        flights[flightKey] = Flight(isRegistered, statusCode, updatedTimestamp, msg.sender);
+    }
 
    /**
     * @dev Buy insurance for a flight
-    *
+    * Ability to purchase flight insurance for no more than 1 ether
     */   
     function buy
-                            (                             
+                            (  
+                                string flight,
+                                address customer                      
                             )
                             external
-                            payable
+                            requireIsOperational
     {
-
+        insuranceCustomers[flight].push(customer);
     }
 
     /**
@@ -125,23 +255,71 @@ contract FlightSuretyData {
     */
     function creditInsurees
                                 (
+                                    address customer,
+                                    uint256 amount
                                 )
-                                external
-                                pure
+                                internal
+                                requireAuthorizedCaller
+                                requireIsOperational
     {
+        if(customerCredits[customer] == 0) {//TODO support credits per flight
+            customerCredits[customer] += amount; 
+        }
+        //else we have already credited, extra request might come when more than 3 oracles send the correct answer
+        
     }
     
+    
+    function refundToCustomers
+                                (
+                                    string  flight
+                                )
+                                external
+                                requireAuthorizedCaller
+                                requireIsOperational
+    {
+        address[] memory eligibleCustomers = insuranceCustomers[flight];
+        require(eligibleCustomers.length > 0, "No eligible customer exists!");
+        require(address(this).balance >= 1.5 ether, "Not sufficint funds available with the contract");
+
+        //TODO find better altervative to using  for loop!
+        for(uint256 i=0; i < eligibleCustomers.length; i++) {
+            creditInsurees(eligibleCustomers[i], 1.5 ether);//We have assumed user will buy the insurance for 1ether so we refund them 1.5 ethers
+        }
+    }
 
     /**
      *  @dev Transfers eligible payout funds to insuree
+        For security reasons let customer withdraw the amount.
      *
     */
-    function pay
+    function withdraw
                             (
+                                address customer
                             )
+                            payable
                             external
-                            pure
+                            requireIsOperational
     {
+        uint256 credits = customerCredits[customer];
+        require(credits > 0 , "You dont have any credits to withdraw");
+        require(credits < address(this).balance , "Contract balance is less than you credits");
+
+        customerCredits[customer] = 0; 
+        customer.transfer(credits);
+    }
+
+    function getCredits
+                            (
+                                address customer
+                            )
+                            public
+                            view
+                            requireIsOperational
+                            requireAuthorizedCaller
+                            returns(uint256)
+    {
+        return customerCredits[customer];
     }
 
    /**
@@ -150,11 +328,17 @@ contract FlightSuretyData {
     *
     */   
     function fund
-                            (   
+                            ( 
+                                
                             )
                             public
                             payable
+                            requireIsOperational
     {
+        require(airlines[msg.sender], "AirLine should be registered before getting funded");
+        require(msg.value >= MIN_FUNDING, "Sent fund are not sufficient!");
+
+        airlineFunding[msg.sender] = msg.value;
     }
 
     function getFlightKey
